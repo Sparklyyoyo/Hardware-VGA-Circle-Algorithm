@@ -17,7 +17,7 @@ SystemVerilog hardware that draws to a 160×120 framebuffer through a VGA adapte
 
 ## Overview
 
-The VGA core continuously scans a 160×120 framebuffer to drive a monitor. My logic writes pixels via `x`, `y`, `colour`, and a `plot` strobe; at most one pixel is written per cycle.
+The VGA core (produced by the University of Toronto) continuously scans a 160×120 framebuffer to drive a monitor. My logic writes pixels via `x`, `y`, `colour`, and a `plot` strobe; at most one pixel is written per cycle.
 
 Key focuses:
 - Deterministic, one-pixel-per-cycle plotting  
@@ -32,7 +32,7 @@ Key focuses:
 - **Pixel write:** on the rising edge with `plot=1`, `(x,y)` is written to the framebuffer  
 - **Color path:** adapter outputs 10-bit VGA RGB; on the DE1-SoC the 8 MSBs are routed to the DAC pins  
 
-In simulation, vendor RAM/PLL libraries are used; in post-synthesis simulation, Cyclone V device models are used. Testbenches observe only the adapter’s public inputs.
+In simulation, vendor libraries are used; in post-synthesis simulation, Cyclone V device models are used. Testbenches observe only the adapter’s public inputs.
 
 ---
 
@@ -90,14 +90,14 @@ Draw a circle perimeter at an arbitrary center and radius using integer arithmet
 ### Implementation
 - **FSM:** `READY → PREP → OCT_1 … OCT_8 → CALC → (loop or DONE)`.  
   - `PREP` initializes `offset_y=0`, `offset_x=radius`, `crit=1-radius`.  
-  - Each `OCT_*` state emits one symmetric octant pixel (one pixel per cycle).  
+  - Each `OCT_*` state emits one pixel per cycle
   - `CALC` updates `offset_y`, `offset_x`, and `crit`. If `offset_y ≤ offset_x`, loops back to `OCT_1`; otherwise transitions to `DONE`.  
 - **Datapath:** Signed registers store `offset_y` (8-bit), `offset_x`/`crit` (9-bit), and temporary signed pixel coordinates.  
 - **Clipping:** Each octant state checks for negative coordinates before asserting `plot`.  
 - **Coloring:** `vga_colour` is directly wired to the `colour` input.
 
 ### Result
-Per-octant emission guarantees symmetry and deterministic one-pixel-per-cycle plotting. The state sequencing matches the canonical Bresenham update, producing a pixel-accurate circle outline and avoiding off-screen writes.
+Per-octant emission guarantees symmetry and deterministic one-pixel-per-cycle plotting. The state sequencing matches the Bresenham Algorithm, producing a pixel-accurate circle outline and avoiding off-screen writes.
 
 ---
 
