@@ -1,22 +1,27 @@
 module tb_rtl_fillscreen();
 
-    logic clk;
-    logic rst_n;
+    // --- DUT I/O Signals ---
+    logic       clk;
+    logic       rst_n;
     logic [2:0] colour;
-    logic start;
-    logic done;
+    logic       start;
+    logic       done;
     logic [7:0] vga_x;
     logic [6:0] vga_y;
     logic [2:0] vga_colour;
-    logic vga_plot;
-    logic err;
+    logic       vga_plot;
+    logic       err;
 
+    // --- Clock Generation ---
     always #5 clk = ~clk;
 
+    // --- Instantiate DUT ---
     fillscreen dut(.*);
 
+    // --- DUT State Machine Variable ---
     enum { READY, DRAW } state;
 
+    // --- Simple Output Checker Task ---
     task check;
 
         input logic [3:0] out;
@@ -30,18 +35,19 @@ module tb_rtl_fillscreen();
         end
     endtask
 
+    // --- Test Sequence ---
     initial begin
-        
-        clk = 1'b1;
+
+        clk   = 1'b1;
         rst_n = 1'b0;
-        err = 1'b0;
+        err   = 1'b0;
 
         #10
 
         check(dut.state, READY);
         colour = 3'b100;
-        start = 1'b1;
-        rst_n = 1'b1;
+        start  = 1'b1;
+        rst_n  = 1'b1;
 
         #10;
 
@@ -49,6 +55,7 @@ module tb_rtl_fillscreen();
         check(vga_plot, 1'b1);
         check(vga_colour, 4);
 
+        // Wait sufficient time for drawing to complete
         #192190;
 
         start = 1'b0;
@@ -61,7 +68,6 @@ module tb_rtl_fillscreen();
 
         if(err)
             $display("FAILED");
-
         else
             $display("PASSED");
         

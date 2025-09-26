@@ -1,10 +1,36 @@
-module circle(input logic clk, input logic rst_n, input logic [2:0] colour,
-              input logic [7:0] centre_x, input logic [6:0] centre_y, input logic [7:0] radius,
-              input logic start, output logic done,
-              output logic [7:0] vga_x, output logic [6:0] vga_y,
-              output logic [2:0] vga_colour, output logic vga_plot);
-     // draw the circle
-     
+/* 
+--- File:    circle.sv
+--- Module:  circle
+--- Brief:   Midpoint circle rasterizer; plots eight symmetric octant points per step until complete.
+
+--- Description:
+---   Drives (vga_x, vga_y, vga_colour, vga_plot) to draw a circle centered at (centre_x, centre_y) with
+---   the given 'radius'. Uses a simple FSM to step through octants (OCT_1..OCT_8) and update the
+---   midpoint decision variable in CALC. 'start' kicks off a draw; 'done' pulses high when finished.
+
+--- Interfaces:
+---   Inputs : clk, rst_n, colour[2:0], centre_x[7:0], centre_y[6:0], radius[7:0], start
+---   Outputs: done, vga_x[7:0], vga_y[6:0], vga_colour[2:0], vga_plot
+
+--- Author: Joey Negm
+*/
+
+module circle(
+     input  logic       clk, 
+     input  logic       rst_n, 
+     input  logic [2:0] colour,
+     input  logic [7:0] centre_x, 
+     input  logic [6:0] centre_y, 
+     input  logic [7:0] radius,
+     input  logic       start, 
+     output logic      done,
+     output logic [7:0] vga_x, 
+     output logic [6:0] vga_y,
+     output logic [2:0] vga_colour, 
+     output logic       vga_plot
+     );
+
+     // Internal signals
      logic signed [7:0] offset_y;
      logic signed [8:0] offset_x;
      logic signed [8:0] crit;
@@ -12,34 +38,35 @@ module circle(input logic clk, input logic rst_n, input logic [2:0] colour,
      logic signed [7:0] signed_vga_y;
      logic signed [8:0] signed_vga_x;
 
+     // FSM state variable
      enum { READY, PREP, OCT_1, OCT_2, OCT_3, OCT_4, OCT_5, OCT_6, OCT_7, OCT_8, CALC, DONE, ERROR } state;
 
-     assign vga_colour = colour;
+     // Combinational assignments
+     assign vga_colour    = colour;
      assign signed_radius = radius;
    
+     // --- FSM and datapath ---
      always_ff @(posedge clk) begin
           if(~rst_n) begin
-               state <= READY;
-               done <= 1'b0;
-               vga_x = 8'd0;
-               vga_y = 7'd0;
+               state    <= READY;
+               done     <= 1'b0;
+               vga_x     = 8'd0;
+               vga_y     = 7'd0;
                vga_plot <= 1'b0;
           end
           else begin
-               
+               // Next state logic
                case (state)
                     READY: begin
-                         
                          if(start)
                               state = PREP;
                          else
                               state = READY;
                     end
+
                     PREP: begin
-                         
                          if(offset_y <= offset_x)
                               state = OCT_1;
-                         
                          else
                               state = DONE;
                     end
@@ -52,176 +79,189 @@ module circle(input logic clk, input logic rst_n, input logic [2:0] colour,
                     OCT_6: state = OCT_7;
                     OCT_7: state = OCT_8;
                     OCT_8: state = CALC;
+
                     CALC: begin
                          if(offset_y <= offset_x)
                               state = OCT_1;
-                         
                          else
                               state = DONE;
                     end
-                    DONE: begin
-                         
+
+                    DONE: begin     
                          if(~start)
                               state = READY;
-                         
                          else
                               state = DONE;
                     end
+
                     default: state = ERROR;
                endcase
+
+               // --- State actions ---
                case (state)
                     READY: begin
-                         done <= 1'b0;
-                         vga_x <= 7'd0;
-                         vga_y <= 7'd0;
+                         done     <= 1'b0;
+                         vga_x    <= 7'd0;
+                         vga_y    <= 7'd0;
                          vga_plot <= 1'b0;
                     end 
+
                     PREP: begin
                          offset_y <= 6'd0;
                          offset_x <= radius;
-                         crit <= 1 - radius;
-                         vga_plot = 1'b0;
+                         crit     <= 1 - radius;
+                         vga_plot  = 1'b0;
                     end
+
                     OCT_1: begin
-                         
                          signed_vga_x = centre_x + offset_x;
                          signed_vga_y = centre_y + offset_y;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     OCT_2: begin
-                         
                          signed_vga_x = centre_x + offset_y;
                          signed_vga_y = centre_y + offset_x;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     OCT_3: begin
-                         
                          signed_vga_x = centre_x - offset_x;
                          signed_vga_y = centre_y + offset_y;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     OCT_4: begin
-                         
                          signed_vga_x = centre_x - offset_y;
                          signed_vga_y = centre_y + offset_x;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     OCT_5: begin
-                         
                          signed_vga_x = centre_x - offset_x;
                          signed_vga_y = centre_y - offset_y;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     OCT_6: begin
-                         
                          signed_vga_x = centre_x - offset_y;
                          signed_vga_y = centre_y - offset_x;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
-                    OCT_7: begin
-                         
+
+                    OCT_7: begin 
                          signed_vga_x = centre_x + offset_x;
                          signed_vga_y = centre_y - offset_y;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     OCT_8: begin
-                         
                          signed_vga_x = centre_x + offset_y;
                          signed_vga_y = centre_y - offset_x;
+
                          if((signed_vga_x < 0) || (signed_vga_y < 0)) begin
                               vga_plot = 1'b0;
-                              vga_x = 8'd0;
-                              vga_y = 7'd0;
+                              vga_x    = 8'd0;
+                              vga_y    = 7'd0;
                          end
                          else begin
                               vga_plot = 1'b1;
-                              vga_x = signed_vga_x [7:0];
-                              vga_y = signed_vga_y [6:0];
+                              vga_x    = signed_vga_x [7:0];
+                              vga_y    = signed_vga_y [6:0];
                          end
                     end
+
                     CALC: begin
                          offset_y = offset_y + 1;
+
                          if(crit <= 0)
                               crit = crit + 2 * offset_y + 1;
                          else begin
-                              
                               offset_x = offset_x - 1;
                               crit = crit + 2 * (offset_y - offset_x) + 1;
                          end
                     end
+
                     DONE: begin
-                         
                          vga_plot <= 1'b0;
-                         done <= 1'b1;
+                         done     <= 1'b1;
                     end
+
                     default: begin
-                         vga_x <= 8'dx;
-                         vga_y <= 7'dx;
+                         vga_x    <= 8'dx;
+                         vga_y    <= 7'dx;
                          vga_plot <= 1'bx;
-                         done <= 1'bx;
+                         done     <= 1'bx;
                     end
                endcase
           end
